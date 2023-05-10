@@ -14,6 +14,10 @@ trait UsageService[F[_]] {
 
   def get(usageFilterInput: UsageFilterInput): F[Vector[Usage]]
 
+  def generateInvoice(invoiceFilterInput: InvoiceFilterInput): F[Invoice]
+
+  def getInvoice(invoiceId: String): F[Invoice]
+
 }
 
 object UsageService {
@@ -63,8 +67,57 @@ class UsageServiceImpl[F[_] : MonadThrow](
         idFilter = usageFilterInput.id,
         startDateFilter = startDate,
         endDateFilter = endDate,
-        usageUnitsFilter = usageUnits
+        usageUnitsFilter = usageUnits,
+        invoicedFilter = usageFilterInput.isInvoiced
       )
     } yield resp
   }
+
+  private def generateInvoiceItems(usages: Vector[Usage]): Vector[InvoiceItem] = {
+    usages.groupBy(_.units).flatMap { case (units, usagesByUnits) =>
+      usagesByUnits.groupBy(_.date).map { case (date, groupedUsages) =>
+        val amountTotal = groupedUsages.map(_.amount).sum
+        InvoiceItem(
+          date = date,
+          units = units,
+          amount = amountTotal,
+          totalCost = amountTotal * units.rate
+        )
+      }
+    }.toVector
+  }
+
+  private def buildInvoice(usages: Vector[Usage], invoiceId: String): Invoice = {
+    val items = generateInvoiceItems(usages)
+    val invoiceTotal = items.map(_.totalCost).sum
+    Invoice(
+      id = invoiceId,
+      total = invoiceTotal,
+      invoiceItems = items,
+    )
+  }
+
+  override def generateInvoice(invoiceFilterInput: InvoiceFilterInput): F[Invoice] = {
+    for {
+      startDate <- invoiceFilterInput.startDate.map(validateDate).sequence.liftTo[F]
+      endDate <- invoiceFilterInput.endDate.map(validateDate).sequence.liftTo[F]
+      usageUnits <- invoiceFilterInput.usageUnits.map(validateUsageUnits).sequence.liftTo[F]
+      usageForInvoicing <- usageRepo.get(
+        idFilter = None,
+        startDateFilter = startDate,
+        endDateFilter = endDate,
+        usageUnitsFilter = usageUnits,
+        invoicedFilter = Some(false)
+      )
+      invoiceId <- usageRepo.getNewInvoiceId
+      _ <- usageRepo.updateUsageWithInvoice(usageForInvoicing.map(_.id), invoiceId)
+    } yield buildInvoice(usageForInvoicing, invoiceId)
+  }
+
+  override def getInvoice(invoiceId: String): F[Invoice] = {
+    for {
+      invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
+    } yield buildInvoice(invoicedUsage, invoiceId)
+  }
+
 }

@@ -6,15 +6,14 @@ import org.http4s.circe.jsonEncoderOf
 
 import java.time.LocalDate
 
-final case class Usage(
-  id: String,
+final case class InvoiceItem(
   date: LocalDate,
   units: UsageUnits,
   amount: BigDecimal,
-  invoiceId: Option[String]
+  totalCost: BigDecimal,
 )
 
-object Usage {
-  implicit val encoder = deriveEncoder[Usage]
-  implicit def entityEncoder[F[_]]: EntityEncoder[F, Vector[Usage]] = jsonEncoderOf
+object InvoiceItem {
+  implicit val encoder = deriveEncoder[InvoiceItem]
+  implicit def entityEncoder[F[_]]: EntityEncoder[F, Vector[InvoiceItem]] = jsonEncoderOf
 }

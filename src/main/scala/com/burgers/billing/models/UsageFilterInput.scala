@@ -9,7 +9,8 @@ case class UsageFilterInput(
   id: Option[String],
   startDate: Option[InputDate],
   endDate: Option[InputDate],
-  usageUnits: Option[InputUsageUnits]
+  usageUnits: Option[InputUsageUnits],
+  isInvoiced: Option[Boolean]
 )
 
 object UsageFilterInput {

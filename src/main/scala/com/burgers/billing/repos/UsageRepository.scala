@@ -8,6 +8,8 @@ import java.time.LocalDate
 
 trait UsageRepository[F[_]] {
 
+  def getNewInvoiceId: F[String]
+
   def create(
     date: LocalDate,
     usageUnits: UsageUnits,
@@ -18,8 +20,16 @@ trait UsageRepository[F[_]] {
     idFilter: Option[String],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
-    usageUnitsFilter: Option[UsageUnits]
+    usageUnitsFilter: Option[UsageUnits],
+    invoicedFilter: Option[Boolean]
   ): F[Vector[Usage]]
+
+  def getByInvoiceId(invoiceId: String): F[Vector[Usage]]
+
+  def updateUsageWithInvoice(
+    usageIds: Vector[String],
+    invoiceId: String
+  ): F[Unit]
 
 }
 
@@ -38,27 +48,48 @@ object UsageRepository {
   private[repos] def filterByUsageUnits(usageUnitsFilter: Option[UsageUnits], usage: Usage): Boolean =
     usageUnitsFilter.isEmpty || usageUnitsFilter.contains(usage.units)
 
+  /** if invoicedFilter is true, only returns true for a usage that has been invoiced
+   *  if invoicedFilter is false, only returns true for a usage that has not been invoiced
+   *  else always return true
+   *
+   * @param invoicedFilter
+   * @param usage
+   * @return
+   */
+  private[repos] def filterByIsInvoiced(invoicedFilter: Option[Boolean], usage: Usage): Boolean =
+    invoicedFilter.isEmpty || invoicedFilter.contains(usage.invoiceId.nonEmpty)
+
   private[repos] def filterUsage(
     idFilter: Option[String],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
     usageUnitsFilter: Option[UsageUnits],
+    invoicedFilter: Option[Boolean],
     usage: Usage
   ): Boolean = filterById(idFilter, usage) &&
     filterByStartDate(startDateFilter, usage) &&
     filterByEndDate(endDateFilter, usage) &&
-    filterByUsageUnits(usageUnitsFilter, usage)
+    filterByUsageUnits(usageUnitsFilter, usage) &&
+    filterByIsInvoiced(invoicedFilter, usage)
 
 }
 
 class UsageRepositoryImpl[F[_] : Applicative] extends UsageRepository[F] {
+
   import UsageRepository._
 
-  private var currentIdValue: Int = 0
+  private var currentUsageIdValue: Int = 0
 
-  private def getNewId: Int = {
-    currentIdValue += 1
-    currentIdValue
+  private def getNewUsageId: Int = {
+    currentUsageIdValue += 1
+    currentUsageIdValue
+  }
+
+  private var currentInvoiceIdValue: Int = 0
+
+  override def getNewInvoiceId: F[String] = {
+    currentInvoiceIdValue += 1
+    currentInvoiceIdValue.toString.pure[F]
   }
 
   import scala.collection.mutable
@@ -66,8 +97,8 @@ class UsageRepositoryImpl[F[_] : Applicative] extends UsageRepository[F] {
   private val usageDataStore = mutable.Map.empty[String, Usage]
 
   override def create(date: LocalDate, usageUnits: UsageUnits, amount: BigDecimal): F[Usage] = {
-    val usageId = getNewId.toString
-    val usage = Usage(usageId, date, usageUnits, amount)
+    val usageId = getNewUsageId.toString
+    val usage = Usage(usageId, date, usageUnits, amount, None)
     usageDataStore += usage.id -> usage
     usage.pure[F]
   }
@@ -76,12 +107,30 @@ class UsageRepositoryImpl[F[_] : Applicative] extends UsageRepository[F] {
     idFilter: Option[String],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
-    usageUnitsFilter: Option[UsageUnits]
+    usageUnitsFilter: Option[UsageUnits],
+    invoicedFilter: Option[Boolean]
   ): F[Vector[Usage]] = {
     usageDataStore.values
-      .filter { filterUsage(idFilter, startDateFilter, endDateFilter, usageUnitsFilter, _) }
+      .filter {
+        filterUsage(idFilter, startDateFilter, endDateFilter, usageUnitsFilter, invoicedFilter, _)
+      }
       .toVector
       .pure[F]
+  }
+
+  override def getByInvoiceId(invoiceId: String): F[Vector[Usage]] = {
+    usageDataStore.values
+      .filter(_.invoiceId.contains(invoiceId))
+      .toVector
+      .pure[F]
+  }
+
+  override def updateUsageWithInvoice(usageIds: Vector[String], invoiceId: String): F[Unit] = {
+    val usages = usageIds.flatMap(usageDataStore.get)
+    val updatedUsages = usages.map(_.copy(invoiceId = Some(invoiceId)))
+    val updatedUsagesMap = updatedUsages.map(u => u.id -> u)
+    usageDataStore ++= updatedUsagesMap
+    ().pure[F]
   }
 
 }
