@@ -78,7 +78,7 @@ From the root of the project, you can spin up a server with:
 sbt run
 ```
 
-Then you can hit any of the endpoints as described above.
+Then you can hit any of the endpoints as described above. I've also included a number of curl commands in a shell script called `curlCommands.sh`
 
 
 ## Things that need to be improved or would be changed for a production system
