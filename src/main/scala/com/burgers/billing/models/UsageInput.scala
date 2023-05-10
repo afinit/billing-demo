@@ -6,8 +6,8 @@ import org.http4s.EntityDecoder
 import org.http4s.circe.jsonOf
 
 final case class UsageInput(
-  date: String,
-  units: String,
+  date: InputDate,
+  units: InputUsageUnits,
   amount: BigDecimal
 )
 

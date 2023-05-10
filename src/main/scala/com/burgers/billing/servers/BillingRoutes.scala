@@ -2,7 +2,8 @@ package com.burgers.billing.servers
 
 import cats.effect.Concurrent
 import cats.implicits._
-import com.burgers.billing.models.UsageInput
+import com.burgers.billing.models.{UsageFilterInput, UsageInput}
+import com.burgers.billing.models.Usage._
 import com.burgers.billing.models.UsageInput._
 import com.burgers.billing.services.UsageService
 import org.http4s.HttpRoutes
@@ -18,8 +19,20 @@ object BillingRoutes {
         req.decode[UsageInput] { usage =>
           val response = for {
             result <- usageService.create(usage)
-            resp <- Ok(result.toString)
+            resp <- Ok(result)
           } yield resp
+          response.handleErrorWith {
+            e: Throwable => BadRequest(e.getMessage)
+          }
+        }
+
+      case req @ POST -> Root / "usage" / "get" =>
+        req.decode[UsageFilterInput] { usageFilter =>
+          val response = for {
+            result <- usageService.get(usageFilter)
+            resp <- Ok(result)
+          } yield resp
+
           response.handleErrorWith {
             e: Throwable => BadRequest(e.getMessage)
           }

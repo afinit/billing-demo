@@ -1,6 +1,7 @@
 package com.burgers.billing.servers
 
 import cats.effect.Async
+import com.burgers.billing.repos.UsageRepository
 import com.burgers.billing.services.UsageService
 import com.comcast.ip4s._
 import org.http4s.ember.server.EmberServerBuilder
@@ -10,7 +11,8 @@ import org.http4s.server.middleware.Logger
 object BillingServer {
 
   def run[F[_]: Async]: F[Nothing] = {
-    val usageService = UsageService.build[F]
+    val usageRepo = UsageRepository.build[F]
+    val usageService = UsageService.build[F](usageRepo)
 
     val httpApp = (
         BillingRoutes.usageRoutes(usageService)

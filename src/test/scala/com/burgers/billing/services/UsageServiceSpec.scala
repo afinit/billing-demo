@@ -1,7 +1,7 @@
 package com.burgers.billing.services
 
 import cats.implicits.catsSyntaxEitherId
-import com.burgers.billing.models.{UsageInput, UsageUnits}
+import com.burgers.billing.models.{InputDate, InputUsageUnits, UsageInput, UsageUnits}
 import munit.CatsEffectSuite
 
 import java.time.LocalDate
@@ -10,14 +10,14 @@ class UsageServiceSpec extends CatsEffectSuite {
   import UsageService._
 
   private val badInput = UsageInput(
-    date = "211-1-1-1",
-    units = "badunits",
+    date = InputDate("211-1-1-1"),
+    units = InputUsageUnits("badunits"),
     amount = -21
   )
 
   private val goodInput = UsageInput(
-    date = "2023-05-10",
-    units = "Storagebytes",
+    date = InputDate("2023-05-10"),
+    units = InputUsageUnits("Storagebytes"),
     amount = 23
   )
 
@@ -26,8 +26,8 @@ class UsageServiceSpec extends CatsEffectSuite {
     val expectedBadDateResult = "Text '211-1-1-1' could not be parsed at index 0".asLeft[LocalDate]
     val expectedGoodDateResult = Right(LocalDate.of(2023, 5, 10))
 
-    val actualBadDateResult = validateDate(badInput).left.map(_.getMessage)
-    val actualGoodDateResult = validateDate(goodInput)
+    val actualBadDateResult = validateDate(badInput.date).left.map(_.getMessage)
+    val actualGoodDateResult = validateDate(goodInput.date)
 
     assertEquals(actualBadDateResult, expectedBadDateResult)
     assertEquals(actualGoodDateResult, expectedGoodDateResult)
@@ -37,8 +37,8 @@ class UsageServiceSpec extends CatsEffectSuite {
     val expectedBad = UsageUnits.badUnitsError.asLeft[UsageUnits]
     val expectedGood = UsageUnits.StorageBytes.asRight[Exception]
 
-    val actualBad = UsageService.validateUsageUnits(badInput)
-    val actualGood = UsageService.validateUsageUnits(goodInput)
+    val actualBad = UsageService.validateUsageUnits(badInput.units)
+    val actualGood = UsageService.validateUsageUnits(goodInput.units)
 
     assertEquals(actualBad, expectedBad)
     assertEquals(actualGood, expectedGood)
