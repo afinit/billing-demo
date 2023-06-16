@@ -4,7 +4,7 @@
 
 - http layer: takes incoming requests forwards them to the service layer
 - service layer: process inputs including validation
-- repository layer: handles datastore access which is 2 simple Maps at this point
+- repository layer: handles datastore access (sqlite DB)
 
 ## Data Types
 
@@ -85,9 +85,6 @@ Then you can hit any of the endpoints as described above. I've also included a n
 
 ### Account
 I didn't include account as part of this yet. Proabably a pretty big missing piece, but I ended up spending my time on other things here like invoice generation.
-
-### Datastore
-The datastore is currently in memory, but I've constructed this in a way that should make it easy to create a new Repository class that accesses a database.
 
 ### Validation
 I would like to use the `Validated` type so that I can do validation across more than one input. There's nothing more frustrating
