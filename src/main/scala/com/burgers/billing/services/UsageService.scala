@@ -1,6 +1,6 @@
 package com.burgers.billing.services
 
-import cats.MonadThrow
+import cats.{MonadThrow, ~>}
 import cats.implicits._
 import com.burgers.billing.models._
 import com.burgers.billing.repos.UsageRepository
@@ -21,8 +21,11 @@ trait UsageService[F[_]] {
 }
 
 object UsageService {
-  def build[F[_] : MonadThrow](usageRepository: UsageRepository[F]): UsageService[F] =
-    new UsageServiceImpl[F](usageRepository)
+  def build[F[_], G[_]: MonadThrow](
+    usageRepository: UsageRepository[G],
+    gToF: G ~> F
+  ): UsageService[F] =
+    new UsageServiceImpl[F, G](usageRepository, gToF)
 
   private[services] val badAmountError = new Exception("amount must be greater than or equal to 0")
 
@@ -42,27 +45,30 @@ object UsageService {
     else input.amount.asRight[Exception]
 }
 
-class UsageServiceImpl[F[_] : MonadThrow](
-  usageRepo: UsageRepository[F]
+class UsageServiceImpl[F[_], G[_]: MonadThrow](
+  usageRepo: UsageRepository[G],
+  gToF: G ~> F
 ) extends UsageService[F] with StrictLogging {
 
   import UsageService._
 
   override def create(usageInput: UsageInput): F[Int] = {
-    for {
-      date <- validateDate(usageInput.date).liftTo[F]
-      usageUnits <- validateUsageUnits(usageInput.units).liftTo[F]
-      amount <- validateAmount(usageInput).liftTo[F]
+    val res = for {
+      date <- validateDate(usageInput.date).liftTo[G]
+      usageUnits <- validateUsageUnits(usageInput.units).liftTo[G]
+      amount <- validateAmount(usageInput).liftTo[G]
       resp <- usageRepo.create(date, usageUnits, amount)
     } yield resp.id
+
+    gToF(res)
   }
 
   override def get(usageFilterInput: UsageFilterInput): F[Vector[Usage]] = {
     logger.info(s"get input: ${usageFilterInput}")
-    for {
-      startDate <- usageFilterInput.startDate.map(validateDate).sequence.liftTo[F]
-      endDate <- usageFilterInput.endDate.map(validateDate).sequence.liftTo[F]
-      usageUnits <- usageFilterInput.usageUnits.map(validateUsageUnits).sequence.liftTo[F]
+    val res = for {
+      startDate <- usageFilterInput.startDate.map(validateDate).sequence.liftTo[G]
+      endDate <- usageFilterInput.endDate.map(validateDate).sequence.liftTo[G]
+      usageUnits <- usageFilterInput.usageUnits.map(validateUsageUnits).sequence.liftTo[G]
       resp <- usageRepo.get(
         idFilter = usageFilterInput.id,
         startDateFilter = startDate,
@@ -71,6 +77,8 @@ class UsageServiceImpl[F[_] : MonadThrow](
         invoicedFilter = usageFilterInput.isInvoiced
       )
     } yield resp
+
+    gToF(res)
   }
 
   private def generateInvoiceItems(usages: Vector[Usage]): Vector[InvoiceItem] = {
@@ -98,10 +106,10 @@ class UsageServiceImpl[F[_] : MonadThrow](
   }
 
   override def generateInvoice(invoiceFilterInput: InvoiceFilterInput): F[Invoice] = {
-    for {
-      startDate <- invoiceFilterInput.startDate.map(validateDate).sequence.liftTo[F]
-      endDate <- invoiceFilterInput.endDate.map(validateDate).sequence.liftTo[F]
-      usageUnits <- invoiceFilterInput.usageUnits.map(validateUsageUnits).sequence.liftTo[F]
+    val res = for {
+      startDate <- invoiceFilterInput.startDate.map(validateDate).sequence.liftTo[G]
+      endDate <- invoiceFilterInput.endDate.map(validateDate).sequence.liftTo[G]
+      usageUnits <- invoiceFilterInput.usageUnits.map(validateUsageUnits).sequence.liftTo[G]
       usageForInvoicing <- usageRepo.get(
         idFilter = None,
         startDateFilter = startDate,
@@ -109,15 +117,19 @@ class UsageServiceImpl[F[_] : MonadThrow](
         usageUnitsFilter = usageUnits,
         invoicedFilter = Some(false)
       )
-      invoiceId <- usageRepo.getNewInvoiceId
+      invoiceId <- usageRepo.createInvoice(LocalDate.now())
       _ <- usageRepo.updateUsageWithInvoice(usageForInvoicing.map(_.id), invoiceId)
     } yield buildInvoice(usageForInvoicing, invoiceId)
+
+    gToF(res)
   }
 
   override def getInvoice(invoiceId: Int): F[Invoice] = {
-    for {
+    val res = for {
       invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
     } yield buildInvoice(invoicedUsage, invoiceId)
+
+    gToF(res)
   }
 
 }
