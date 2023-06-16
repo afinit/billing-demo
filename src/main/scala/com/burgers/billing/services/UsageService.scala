@@ -3,7 +3,7 @@ package com.burgers.billing.services
 import cats.{MonadThrow, ~>}
 import cats.implicits._
 import com.burgers.billing.models._
-import com.burgers.billing.repos.UsageRepository
+import com.burgers.billing.repos.{InvoiceRepository, UsageRepository}
 import com.typesafe.scalalogging.StrictLogging
 
 import java.time.LocalDate
@@ -23,9 +23,10 @@ trait UsageService[F[_]] {
 object UsageService {
   def build[F[_], G[_]: MonadThrow](
     usageRepository: UsageRepository[G],
+    invoiceRepository: InvoiceRepository[G],
     gToF: G ~> F
   ): UsageService[F] =
-    new UsageServiceImpl[F, G](usageRepository, gToF)
+    new UsageServiceImpl[F, G](usageRepository, invoiceRepository, gToF)
 
   private[services] val badAmountError = new Exception("amount must be greater than or equal to 0")
 
@@ -47,6 +48,7 @@ object UsageService {
 
 class UsageServiceImpl[F[_], G[_]: MonadThrow](
   usageRepo: UsageRepository[G],
+  invoiceRepo: InvoiceRepository[G],
   gToF: G ~> F
 ) extends UsageService[F] with StrictLogging {
 
@@ -117,7 +119,7 @@ class UsageServiceImpl[F[_], G[_]: MonadThrow](
         usageUnitsFilter = usageUnits,
         invoicedFilter = Some(false)
       )
-      invoiceId <- usageRepo.createInvoice(LocalDate.now())
+      invoiceId <- invoiceRepo.createInvoice(LocalDate.now())
       _ <- usageRepo.updateUsageWithInvoice(usageForInvoicing.map(_.id), invoiceId)
     } yield buildInvoice(usageForInvoicing, invoiceId)
 

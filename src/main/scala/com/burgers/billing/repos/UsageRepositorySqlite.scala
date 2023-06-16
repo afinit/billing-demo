@@ -61,44 +61,9 @@ class UsageRepositorySqlite extends UsageRepository[ConnectionIO] {
     }
   }
 
-  override def createInvoice(date: LocalDate): ConnectionIO[Int] = {
-    val q =
-      sql"""
-        |INSERT INTO invoice(invoiceDateEpoch)
-        |VALUES (${date.toEpochDay})
-        |""".stripMargin
-    q.update.withUniqueGeneratedKeys[Int]("rowid")
-  }
-
 }
 
 object UsageRepositorySqlite {
-
-  private def createInvoiceTable =
-    sql"""
-         |CREATE TABLE IF NOT EXISTS invoice (
-         |  invoiceDateEpoch INT NOT NULL
-         |)
-         |""".stripMargin.update.run
-
-  private def createUsageTable =
-    sql"""
-         |CREATE TABLE IF NOT EXISTS usage (
-         |  dateEpoch INT NOT NULL,
-         |  usageUnits TEXT NOT NULL,
-         |  amount NUMERIC NOT NULL,
-         |  invoiceId INT,
-         |  FOREIGN KEY(invoiceId) REFERENCES invoice(rowid)
-         |)
-         |""".stripMargin.update.run
-
-  def build: UsageRepository[ConnectionIO] = new UsageRepositorySqlite
-
-  // establishes ease of use for a toy application. the goal is to make sure this is easy to spin up with a fresh db
-  def createTables: ConnectionIO[Unit] = for {
-    _ <- createInvoiceTable
-    _ <- createUsageTable
-  } yield ()
 
   implicit val localDateGet: Get[LocalDate] = Get[Int].tmap(l => LocalDate.ofEpochDay(l.toLong))
   implicit val usageUnitsGet: Get[UsageUnits] = Get[String].tmap(UsageUnits.fromString(_).fold(e => throw e, identity))

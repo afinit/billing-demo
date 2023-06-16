@@ -11,7 +11,7 @@ import java.time.LocalDate
 
 class UsageRepositorySpec extends CatsEffectSuite {
 
-  private val invoiceId = 121
+  private val invoiceId = 1
 
   private val usage1 = Usage(
     id = 1,
@@ -48,13 +48,16 @@ class UsageRepositorySpec extends CatsEffectSuite {
   // prevents commits to the db so we can always work with a clean db
   private val transactor = Transactor.strategy.set(transactorBase, Strategy.default.copy(after = unit, oops = unit))
 
-  test("testing the new usage repo") {
+  test("testing the sqlite usage repo") {
     val actual = for {
-      _ <- UsageRepositorySqlite.createTables
-      usageRepo = UsageRepositorySqlite.build
+      _ <- SqliteDbSetup.createTables
+      usageRepo = UsageRepository.buildSqlite
+      invoiceRepo = InvoiceRepository.buildSqlite
+
       _ <- usageRepo.create(usage1.date, usage1.units, usage1.amount)
       _ <- usageRepo.create(usage2.date, usage2.units, usage2.amount)
       _ <- usageRepo.create(usage3.date, usage3.units, usage3.amount)
+      invoiceId <- invoiceRepo.createInvoice(LocalDate.now())
       _ <- usageRepo.updateUsageWithInvoice(Vector(3), invoiceId)
       allUsages <- usageRepo.get(None, None, None, None, None)
       invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)

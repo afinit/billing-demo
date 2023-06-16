@@ -4,7 +4,7 @@ import cats.arrow.FunctionK
 import cats.effect.kernel.Resource
 import cats.effect.{IO, IOApp}
 import cats.~>
-import com.burgers.billing.repos.UsageRepositorySqlite
+import com.burgers.billing.repos.{InvoiceRepository, SqliteDbSetup, UsageRepository}
 import com.burgers.billing.servers.BillingServer
 import com.burgers.billing.services.UsageService
 import doobie.ConnectionIO
@@ -20,10 +20,11 @@ object Main extends IOApp.Simple {
   }
 
   private val resource: Resource[IO, Unit] = for {
-    _ <- Resource.eval(gToF(UsageRepositorySqlite.createTables))
+    _ <- Resource.eval(gToF(SqliteDbSetup.createTables))
 
-    usageRepo = UsageRepositorySqlite.build
-    usageService = UsageService.build[IO, ConnectionIO](usageRepo, gToF)
+    usageRepo = UsageRepository.buildSqlite
+    invoiceRepo = InvoiceRepository.buildSqlite
+    usageService = UsageService.build[IO, ConnectionIO](usageRepo, invoiceRepo, gToF)
 
     server <- BillingServer.build[IO](usageService)
   } yield server

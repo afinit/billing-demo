@@ -1,6 +1,7 @@
 package com.burgers.billing.repos
 
 import com.burgers.billing.models.{Usage, UsageUnits}
+import doobie.ConnectionIO
 
 import java.time.LocalDate
 
@@ -27,8 +28,9 @@ trait UsageRepository[F[_]] {
     invoiceId: Int
   ): F[Unit]
 
-  def createInvoice(
-    date: LocalDate
-  ): F[Int]
+}
 
+object UsageRepository {
+
+  def buildSqlite: UsageRepository[ConnectionIO] = new UsageRepositorySqlite
 }
