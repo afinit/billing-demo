@@ -10,6 +10,10 @@ trait InvoiceRepository[F[_]] {
     date: LocalDate
   ): F[Int]
 
+  def getInvoiceDate(
+    id: Int
+  ): F[Option[LocalDate]]
+
 }
 
 object InvoiceRepository {

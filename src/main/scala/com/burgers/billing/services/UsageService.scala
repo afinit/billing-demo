@@ -29,6 +29,7 @@ object UsageService {
     new UsageServiceImpl[F, G](usageRepository, invoiceRepository, gToF)
 
   private[services] val badAmountError = new Exception("amount must be greater than or equal to 0")
+  private[services] def invoiceNotFoundError(invoiceId: Int) = new Exception(s"InvoiceId not found: ${invoiceId}")
 
   private[services] def validateDate(inputDate: InputDate): Either[Exception, LocalDate] =
     try {
@@ -97,15 +98,21 @@ class UsageServiceImpl[F[_], G[_]: MonadThrow](
     }.toVector
   }
 
-  private def buildInvoice(usages: Vector[Usage], invoiceId: Int): Invoice = {
+  private def buildInvoice(usages: Vector[Usage], invoiceId: Int, invoiceDate: LocalDate): Invoice = {
     val items = generateInvoiceItems(usages)
     val invoiceTotal = items.map(_.totalCost).sum
     Invoice(
       id = invoiceId,
+      invoiceDate = invoiceDate,
       total = invoiceTotal,
-      invoiceItems = items,
+      invoiceItems = items
     )
   }
+
+  private def getInvoiceDate(invoiceId: Int): G[LocalDate] = for {
+    invoiceDateOpt <- invoiceRepo.getInvoiceDate(invoiceId)
+    invoiceDate <- invoiceDateOpt.toRight(invoiceNotFoundError(invoiceId)).liftTo[G]
+  } yield invoiceDate
 
   override def generateInvoice(invoiceFilterInput: InvoiceFilterInput): F[Invoice] = {
     val res = for {
@@ -120,8 +127,9 @@ class UsageServiceImpl[F[_], G[_]: MonadThrow](
         invoicedFilter = Some(false)
       )
       invoiceId <- invoiceRepo.createInvoice(LocalDate.now())
+      invoiceDate <- getInvoiceDate(invoiceId)
       _ <- usageRepo.updateUsageWithInvoice(usageForInvoicing.map(_.id), invoiceId)
-    } yield buildInvoice(usageForInvoicing, invoiceId)
+    } yield buildInvoice(usageForInvoicing, invoiceId, invoiceDate)
 
     gToF(res)
   }
@@ -129,7 +137,8 @@ class UsageServiceImpl[F[_], G[_]: MonadThrow](
   override def getInvoice(invoiceId: Int): F[Invoice] = {
     val res = for {
       invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
-    } yield buildInvoice(invoicedUsage, invoiceId)
+      invoiceDate <- getInvoiceDate(invoiceId)
+    } yield buildInvoice(invoicedUsage, invoiceId, invoiceDate)
 
     gToF(res)
   }

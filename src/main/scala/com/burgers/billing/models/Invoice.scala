@@ -4,8 +4,11 @@ import io.circe.generic.semiauto.deriveEncoder
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
+import java.time.LocalDate
+
 case class Invoice(
   id: Int,
+  invoiceDate: LocalDate,
   total: BigDecimal,
   invoiceItems: Vector[InvoiceItem]
 )

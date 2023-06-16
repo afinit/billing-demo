@@ -11,7 +11,7 @@ import java.time.LocalDate
 
 class UsageRepositorySqlite extends UsageRepository[ConnectionIO] {
 
-  import UsageRepositorySqlite._
+  import DbImplicits._
 
   private def selectUsageColumns = fr"SELECT rowid, dateEpoch, usageUnits, amount, invoiceId FROM usage"
 
@@ -61,11 +61,4 @@ class UsageRepositorySqlite extends UsageRepository[ConnectionIO] {
     }
   }
 
-}
-
-object UsageRepositorySqlite {
-
-  implicit val localDateGet: Get[LocalDate] = Get[Int].tmap(l => LocalDate.ofEpochDay(l.toLong))
-  implicit val usageUnitsGet: Get[UsageUnits] = Get[String].tmap(UsageUnits.fromString(_).fold(e => throw e, identity))
-  implicit val bigDecimal: Get[BigDecimal] = Get[Double].tmap(BigDecimal(_))
 }
