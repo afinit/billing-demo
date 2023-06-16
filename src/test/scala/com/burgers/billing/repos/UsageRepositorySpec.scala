@@ -2,6 +2,9 @@ package com.burgers.billing.repos
 
 import cats.effect.IO
 import com.burgers.billing.models.{Usage, UsageUnits}
+import doobie.free.connection.unit
+import doobie.implicits._
+import doobie.util.transactor.{Strategy, Transactor}
 import munit.CatsEffectSuite
 
 import java.time.LocalDate
@@ -10,10 +13,10 @@ class UsageRepositorySpec extends CatsEffectSuite {
 
   import UsageRepository._
 
-  private val invoiceId = "Burger of the day"
+  private val invoiceId = 121
 
   private val usage1 = Usage(
-    id = "1",
+    id = 1,
     date = LocalDate.of(2023, 5, 10),
     units = UsageUnits.StorageBytes,
     amount = 32,
@@ -21,7 +24,7 @@ class UsageRepositorySpec extends CatsEffectSuite {
   )
 
   private val usage2 = Usage(
-    id = "2",
+    id = 2,
     date = LocalDate.of(2023, 6, 9),
     units = UsageUnits.Cpu,
     amount = 41,
@@ -29,7 +32,7 @@ class UsageRepositorySpec extends CatsEffectSuite {
   )
 
   private val usage3 = Usage(
-    id = "3",
+    id = 3,
     date = LocalDate.of(2023, 7, 8),
     units = UsageUnits.BandwidthBytes,
     amount = 50,
@@ -37,7 +40,7 @@ class UsageRepositorySpec extends CatsEffectSuite {
   )
 
   test("UsageRepository filters by id") {
-    val filter = filterById(Some("1"), _)
+    val filter = filterById(Some(1), _)
     val filterEmpty = filterById(None, _)
 
     val actual1 = filter(usage1)
@@ -104,12 +107,37 @@ class UsageRepositorySpec extends CatsEffectSuite {
       _ <- usageRepo.create(usage1.date, usage1.units, usage1.amount)
       _ <- usageRepo.create(usage2.date, usage2.units, usage2.amount)
       _ <- usageRepo.create(usage3.date, usage3.units, usage3.amount)
-      _ <- usageRepo.updateUsageWithInvoice(Vector("3"), invoiceId)
+      _ <- usageRepo.updateUsageWithInvoice(Vector(3), invoiceId)
       allUsages <- usageRepo.get(None, None, None, None, None)
       invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
     } yield (allUsages, invoicedUsage)
 
     assertIO(actual, expected)
+  }
+
+  private val transactorBase = Transactor.fromDriverManager[IO](
+    "org.sqlite.JDBC", // driver classname
+    "jdbc:sqlite::memory:", // connect URL
+    "",
+    "",
+  )
+  private val transactor = Transactor.strategy.set(transactorBase, Strategy.default.copy(after = unit, oops = unit))
+
+  test("testing the new usage repo") {
+    val actual = for {
+      usageRepo <- UsageRepositorySqlite.build
+      _ <- usageRepo.create(usage1.date, usage1.units, usage1.amount)
+      _ <- usageRepo.create(usage2.date, usage2.units, usage2.amount)
+      _ <- usageRepo.create(usage3.date, usage3.units, usage3.amount)
+      _ <- usageRepo.updateUsageWithInvoice(Vector(3), invoiceId)
+      allUsages <- usageRepo.get(None, None, None, None, None)
+      invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
+    } yield (allUsages, invoicedUsage)
+
+    val expected = (Vector(usage1, usage2, usage3), Vector(usage3))
+
+    val actualIO = actual.transact(transactor)
+    assertIO(actualIO, expected)
   }
 
 }

@@ -19,7 +19,7 @@ object BillingRoutes {
         req.decode[UsageInput] { usage =>
           val response = for {
             result <- usageService.create(usage)
-            resp <- Ok(result)
+            resp <- Ok(result.toString)
           } yield resp
           response.handleErrorWith {
             e: Throwable => BadRequest(e.getMessage)
@@ -50,7 +50,7 @@ object BillingRoutes {
           }
         }
 
-      case GET -> Root / "invoice" / invoiceId =>
+      case GET -> Root / "invoice" / IntVar(invoiceId) =>
         val response = for {
           result <- usageService.getInvoice(invoiceId)
           resp <- Ok(result)

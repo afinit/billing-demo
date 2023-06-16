@@ -10,13 +10,13 @@ import java.time.LocalDate
 
 trait UsageService[F[_]] {
 
-  def create(usageInput: UsageInput): F[String]
+  def create(usageInput: UsageInput): F[Int]
 
   def get(usageFilterInput: UsageFilterInput): F[Vector[Usage]]
 
   def generateInvoice(invoiceFilterInput: InvoiceFilterInput): F[Invoice]
 
-  def getInvoice(invoiceId: String): F[Invoice]
+  def getInvoice(invoiceId: Int): F[Invoice]
 
 }
 
@@ -48,7 +48,7 @@ class UsageServiceImpl[F[_] : MonadThrow](
 
   import UsageService._
 
-  override def create(usageInput: UsageInput): F[String] = {
+  override def create(usageInput: UsageInput): F[Int] = {
     for {
       date <- validateDate(usageInput.date).liftTo[F]
       usageUnits <- validateUsageUnits(usageInput.units).liftTo[F]
@@ -87,7 +87,7 @@ class UsageServiceImpl[F[_] : MonadThrow](
     }.toVector
   }
 
-  private def buildInvoice(usages: Vector[Usage], invoiceId: String): Invoice = {
+  private def buildInvoice(usages: Vector[Usage], invoiceId: Int): Invoice = {
     val items = generateInvoiceItems(usages)
     val invoiceTotal = items.map(_.totalCost).sum
     Invoice(
@@ -114,7 +114,7 @@ class UsageServiceImpl[F[_] : MonadThrow](
     } yield buildInvoice(usageForInvoicing, invoiceId)
   }
 
-  override def getInvoice(invoiceId: String): F[Invoice] = {
+  override def getInvoice(invoiceId: Int): F[Invoice] = {
     for {
       invoicedUsage <- usageRepo.getByInvoiceId(invoiceId)
     } yield buildInvoice(invoicedUsage, invoiceId)

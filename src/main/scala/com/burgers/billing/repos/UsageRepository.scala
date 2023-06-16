@@ -8,7 +8,7 @@ import java.time.LocalDate
 
 trait UsageRepository[F[_]] {
 
-  def getNewInvoiceId: F[String]
+  def getNewInvoiceId: F[Int]
 
   def create(
     date: LocalDate,
@@ -17,18 +17,18 @@ trait UsageRepository[F[_]] {
   ): F[Usage]
 
   def get(
-    idFilter: Option[String],
+    idFilter: Option[Int],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
     usageUnitsFilter: Option[UsageUnits],
     invoicedFilter: Option[Boolean]
   ): F[Vector[Usage]]
 
-  def getByInvoiceId(invoiceId: String): F[Vector[Usage]]
+  def getByInvoiceId(invoiceId: Int): F[Vector[Usage]]
 
   def updateUsageWithInvoice(
-    usageIds: Vector[String],
-    invoiceId: String
+    usageIds: Vector[Int],
+    invoiceId: Int
   ): F[Unit]
 
 }
@@ -36,7 +36,7 @@ trait UsageRepository[F[_]] {
 object UsageRepository {
   def build[F[_] : Applicative]: UsageRepository[F] = new UsageRepositoryImpl[F]
 
-  private[repos] def filterById(idFilter: Option[String], usage: Usage): Boolean =
+  private[repos] def filterById(idFilter: Option[Int], usage: Usage): Boolean =
     idFilter.isEmpty || idFilter.contains(usage.id)
 
   private[repos] def filterByStartDate(startDateFilter: Option[LocalDate], usage: Usage): Boolean =
@@ -60,7 +60,7 @@ object UsageRepository {
     invoicedFilter.isEmpty || invoicedFilter.contains(usage.invoiceId.nonEmpty)
 
   private[repos] def filterUsage(
-    idFilter: Option[String],
+    idFilter: Option[Int],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
     usageUnitsFilter: Option[UsageUnits],
@@ -87,24 +87,24 @@ class UsageRepositoryImpl[F[_] : Applicative] extends UsageRepository[F] {
 
   private var currentInvoiceIdValue: Int = 0
 
-  override def getNewInvoiceId: F[String] = {
+  override def getNewInvoiceId: F[Int] = {
     currentInvoiceIdValue += 1
-    currentInvoiceIdValue.toString.pure[F]
+    currentInvoiceIdValue.pure[F]
   }
 
   import scala.collection.mutable
 
-  private val usageDataStore = mutable.Map.empty[String, Usage]
+  private val usageDataStore = mutable.Map.empty[Int, Usage]
 
   override def create(date: LocalDate, usageUnits: UsageUnits, amount: BigDecimal): F[Usage] = {
-    val usageId = getNewUsageId.toString
+    val usageId = getNewUsageId
     val usage = Usage(usageId, date, usageUnits, amount, None)
     usageDataStore += usage.id -> usage
     usage.pure[F]
   }
 
   override def get(
-    idFilter: Option[String],
+    idFilter: Option[Int],
     startDateFilter: Option[LocalDate],
     endDateFilter: Option[LocalDate],
     usageUnitsFilter: Option[UsageUnits],
@@ -118,14 +118,14 @@ class UsageRepositoryImpl[F[_] : Applicative] extends UsageRepository[F] {
       .pure[F]
   }
 
-  override def getByInvoiceId(invoiceId: String): F[Vector[Usage]] = {
+  override def getByInvoiceId(invoiceId: Int): F[Vector[Usage]] = {
     usageDataStore.values
       .filter(_.invoiceId.contains(invoiceId))
       .toVector
       .pure[F]
   }
 
-  override def updateUsageWithInvoice(usageIds: Vector[String], invoiceId: String): F[Unit] = {
+  override def updateUsageWithInvoice(usageIds: Vector[Int], invoiceId: Int): F[Unit] = {
     val usages = usageIds.flatMap(usageDataStore.get)
     val updatedUsages = usages.map(_.copy(invoiceId = Some(invoiceId)))
     val updatedUsagesMap = updatedUsages.map(u => u.id -> u)

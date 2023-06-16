@@ -5,7 +5,7 @@ import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
 case class Invoice(
-  id: String,
+  id: Int,
   total: BigDecimal,
   invoiceItems: Vector[InvoiceItem]
 )

@@ -6,7 +6,7 @@ import org.http4s.EntityDecoder
 import org.http4s.circe.jsonOf
 
 case class UsageFilterInput(
-  id: Option[String],
+  id: Option[Int],
   startDate: Option[InputDate],
   endDate: Option[InputDate],
   usageUnits: Option[InputUsageUnits],

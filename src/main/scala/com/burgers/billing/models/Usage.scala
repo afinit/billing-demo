@@ -7,11 +7,11 @@ import org.http4s.circe.jsonEncoderOf
 import java.time.LocalDate
 
 final case class Usage(
-  id: String,
+  id: Int,
   date: LocalDate,
   units: UsageUnits,
   amount: BigDecimal,
-  invoiceId: Option[String]
+  invoiceId: Option[Int]
 )
 
 object Usage {
